@@ -1,0 +1,38 @@
+[Unit]
+Description=ParkCloud FastAPI Uvicorn Daemon Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/parkcloud/backend
+
+# Load environment configuration
+Environment="PATH=/var/www/parkcloud/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=-/var/www/parkcloud/backend/.env
+
+# Execute FastAPI via Uvicorn with 2 workers (optimal for EC2 t2.micro / t3.micro 1-2 vCPUs)
+ExecStart=/var/www/parkcloud/backend/venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2 \
+    --proxy-headers \
+    --forwarded-allow-ips="*"
+
+# Restart policy for high availability
+Restart=always
+RestartSec=5s
+
+# Security sandboxing
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+# Standard logs to systemd journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=parkcloud-api
+
+[Install]
+WantedBy=multi-user.target

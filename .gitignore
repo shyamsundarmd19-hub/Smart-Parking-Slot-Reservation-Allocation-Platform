@@ -1,0 +1,43 @@
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python Virtual Environments & Bytecode
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite
+*.sqlite3
+*.db
+backend/test_dev.db
+backend/parkcloud.db
+
+# Node & Frontend Build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+dist/
+
+# OS & Editor generated files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Local uploads & test reports
+backend/uploads/
+uploads/
+load_test_report.html
+load_test_metrics*
+*.log

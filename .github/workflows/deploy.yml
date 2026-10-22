@@ -1,0 +1,97 @@
+name: ParkCloud CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================================
+  # 1. Validation & Test Job
+  # ============================================================================
+  test_and_build:
+    name: Test & Build Artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Python Backend Verification
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Verify Backend Syntax & Import Tree
+        run: |
+          python -m py_compile backend/app/main.py
+          python -c "import app.models; import app.routers; import app.services; print('Backend modules verified!')"
+        working-directory: ./backend
+
+      # Frontend React SPA Build Verification
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci || npm install
+        working-directory: ./frontend
+
+      - name: Build React SPA
+        run: npm run build
+        working-directory: ./frontend
+
+  # ============================================================================
+  # 2. Automated SSH Deployment to AWS EC2
+  # ============================================================================
+  deploy_to_ec2:
+    name: Deploy to AWS EC2 Free Tier
+    needs: test_and_build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Key & Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER || 'ubuntu' }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT || 22 }}
+          script_stop: true
+          script: |
+            echo "Connected to AWS EC2 instance: $(hostname)"
+            
+            # Navigate to project location on EC2
+            if [ -d "/home/ubuntu/parkcloud" ]; then
+              cd /home/ubuntu/parkcloud
+            elif [ -d "/var/www/parkcloud/repo" ]; then
+              cd /var/www/parkcloud/repo
+            else
+              mkdir -p /home/ubuntu/parkcloud
+              cd /home/ubuntu/parkcloud
+              git clone https://github.com/${{ github.repository }}.git .
+            fi
+            
+            # Fetch latest commits
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Execute automated deployment script
+            chmod +x scripts/deploy.sh
+            sudo bash scripts/deploy.sh
